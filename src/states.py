@@ -224,7 +224,13 @@ class GameState:
         self.render_state = RenderState()
 
     def is_boost_big(self, idx):
-        return self.boost_pad_locations[idx].z == 73
+        z = self.boost_pad_locations[idx].z
+        gamemode = (self.gamemode or "soccar").lower()
+        if gamemode == "heatseeker":
+            gamemode = "soccar"
+        if gamemode == "hoops":
+            return z >= 70
+        return z >= 73
 
     def read_from_json(self, j):
 
