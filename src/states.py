@@ -161,7 +161,9 @@ class CarState:
         if not (j.get("controls") is None):
             self.controls.read_from_json(j["controls"])
 
-        self.is_boosting = j["boost_amount"] < self.boost_amount
+        # Detect boosting: either boost amount decreased, or controls say boost is held
+        # (needed for Heatseeker where boost doesn't decrease)
+        self.is_boosting = (j["boost_amount"] < self.boost_amount) or self.controls.boost
         self.boost_amount = j["boost_amount"]
         self.on_ground = j["on_ground"]
         if not (j.get("has_flipped_or_double_jumped") is None):
