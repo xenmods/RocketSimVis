@@ -203,7 +203,10 @@ class QRewardBarWidget(QWidget):
         self.max_abs_cumulative = 1.0  # For scaling the cumulative bar
         
         self.setMinimumHeight(round(22 * get_scaling_factor()))
-        self.setMinimumWidth(round(500 * get_scaling_factor()))
+        self.setMinimumWidth(round(350 * get_scaling_factor()))
+        
+        # Allow horizontal expansion
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         
     def set_data(self, name: str, instant_value: float, cumulative_value: float,
                  max_abs_instant: float = 1.0, max_abs_cumulative: float = 1.0):
@@ -221,13 +224,15 @@ class QRewardBarWidget(QWidget):
         rect = self.rect()
         margin = 2
         bar_height = rect.height() - margin * 2
+        available_width = rect.width() - margin * 2
         
-        # Layout: [Name 180px] [Instant bar 100px] [Instant val 70px] [Cumul bar 80px] [Cumul val 70px]
-        name_width = 180
-        instant_bar_width = 100
-        instant_val_width = 70
-        cumul_bar_width = 80
-        cumul_val_width = 70
+        # Dynamic layout based on available width
+        # Proportions: name 35%, instant_bar 20%, instant_val 15%, cumul_bar 15%, cumul_val 15%
+        name_width = int(available_width * 0.35)
+        instant_bar_width = int(available_width * 0.20)
+        instant_val_width = int(available_width * 0.15)
+        cumul_bar_width = int(available_width * 0.15)
+        cumul_val_width = int(available_width * 0.15)
         
         # Draw background
         painter.fillRect(rect, QColor(25, 25, 25))
@@ -240,8 +245,11 @@ class QRewardBarWidget(QWidget):
         
         x = margin
         
-        # Draw name
-        name_display = self.name[:22] + "..." if len(self.name) > 25 else self.name
+        # Draw name - truncate based on available width
+        fm = painter.fontMetrics()
+        name_display = self.name
+        while fm.horizontalAdvance(name_display) > name_width - 10 and len(name_display) > 3:
+            name_display = name_display[:-4] + "..."
         painter.drawText(x, margin, name_width - 5, bar_height, 
                         Qt.AlignLeft | Qt.AlignVCenter, name_display)
         x += name_width
@@ -311,6 +319,9 @@ class QPlayerRewardsWidget(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WA_StyledBackground)
         self.setAutoFillBackground(True)
+        
+        # Allow horizontal expansion
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(4, 4, 4, 4)
@@ -399,37 +410,148 @@ class QPlayerRewardsWidget(QWidget):
 
 
 class QRewardsPanelWidget(QWidget):
-    """Panel showing per-player reward information"""
+    """Panel showing per-player reward information - resizable"""
+    
+    RESIZE_MARGIN = 8  # Pixels from edge to trigger resize
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_StyledBackground)
         self.setAutoFillBackground(True)
         
+        # Enable mouse tracking for resize cursor
+        self.setMouseTracking(True)
+        
+        # Resize state
+        self._resizing = False
+        self._resize_edge = None  # 'left', 'bottom', 'corner'
+        self._drag_start_pos = None
+        self._drag_start_geometry = None
+        
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(6, 6, 6, 6)
         self.layout.setSpacing(4)
         
         # Title
-        self.title = QtWidgets.QLabel("Rewards")
+        self.title = QtWidgets.QLabel("Rewards (drag edges to resize)")
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setStyleSheet("font-weight: bold; font-size: 11pt;")
         self.layout.addWidget(self.title)
+        
+        # Scroll area for player widgets
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setStyleSheet("QScrollArea { border: none; }")
         
         # Container for player reward widgets
         self.players_container = QWidget()
         self.players_layout = QtWidgets.QVBoxLayout(self.players_container)
         self.players_layout.setContentsMargins(0, 0, 0, 0)
         self.players_layout.setSpacing(6)
-        self.layout.addWidget(self.players_container)
+        self.scroll_area.setWidget(self.players_container)
+        
+        self.layout.addWidget(self.scroll_area)
         
         self.player_widgets: list[QPlayerRewardsWidget] = []
         
-        # Set minimum size
-        self.setMinimumWidth(round(520 * get_scaling_factor()))
+        # Set minimum and default size
+        self.setMinimumWidth(round(300 * get_scaling_factor()))
+        self.setMinimumHeight(round(200 * get_scaling_factor()))
+        self._default_width = round(550 * get_scaling_factor())
+        self._default_height = round(500 * get_scaling_factor())
+        self.resize(self._default_width, self._default_height)
+        self._first_show = True
         
         global _g_rewards_panel
         _g_rewards_panel = self
+    
+    def showEvent(self, event):
+        """Position panel when first shown"""
+        super().showEvent(event)
+        if self._first_show and self.parent():
+            self._first_show = False
+            parent = self.parent()
+            # Position at top-right of parent
+            new_x = parent.width() - self.width() - 10
+            self.move(max(10, new_x), 10)
+    
+    def _get_resize_edge(self, pos):
+        """Determine which edge/corner the mouse is near"""
+        margin = self.RESIZE_MARGIN
+        rect = self.rect()
+        
+        near_left = pos.x() < margin
+        near_bottom = pos.y() > rect.height() - margin
+        
+        if near_left and near_bottom:
+            return 'corner'
+        elif near_left:
+            return 'left'
+        elif near_bottom:
+            return 'bottom'
+        return None
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            edge = self._get_resize_edge(event.pos())
+            if edge:
+                self._resizing = True
+                self._resize_edge = edge
+                self._drag_start_pos = event.globalPos()
+                self._drag_start_geometry = self.geometry()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        if self._resizing and self._drag_start_pos:
+            delta = event.globalPos() - self._drag_start_pos
+            geom = QRect(self._drag_start_geometry)
+            
+            if self._resize_edge in ('left', 'corner'):
+                # Resize from left edge (panel is on right side, so left = width change)
+                new_width = geom.width() - delta.x()
+                new_width = max(new_width, self.minimumWidth())
+                new_left = geom.right() - new_width + 1
+                geom.setLeft(new_left)
+            
+            if self._resize_edge in ('bottom', 'corner'):
+                new_height = geom.height() + delta.y()
+                new_height = max(new_height, self.minimumHeight())
+                geom.setHeight(new_height)
+            
+            self.setGeometry(geom)
+            event.accept()
+            return
+        else:
+            # Update cursor based on position
+            edge = self._get_resize_edge(event.pos())
+            if edge == 'corner':
+                self.setCursor(Qt.SizeBDiagCursor)
+            elif edge == 'left':
+                self.setCursor(Qt.SizeHorCursor)
+            elif edge == 'bottom':
+                self.setCursor(Qt.SizeVerCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+        
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._resizing:
+            self._resizing = False
+            self._resize_edge = None
+            self._drag_start_pos = None
+            self._drag_start_geometry = None
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+    
+    def leaveEvent(self, event):
+        self.setCursor(Qt.ArrowCursor)
+        super().leaveEvent(event)
     
     def update_rewards(self, car_states, spectate_idx: int):
         """
@@ -478,7 +600,7 @@ class QRewardsPanelWidget(QWidget):
             )
             self.player_widgets[i].show()
         
-        self.adjustSize()
+        # Don't call adjustSize() - let user control the size via drag handles
 
 
 def get_rewards_panel() -> Optional[QRewardsPanelWidget]:
@@ -519,7 +641,25 @@ class QRSVWindow(QtWidgets.QMainWindow):
         
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._position_widgets()
+        # Keep rewards panel within window bounds and anchored to top-right
+        if hasattr(self, 'rewards_panel') and self.rewards_panel.isVisible():
+            panel = self.rewards_panel
+            panel_width = panel.width()
+            panel_height = panel.height()
+            
+            # Anchor to top-right corner with margin
+            new_x = self.width() - panel_width - 10
+            new_y = 10
+            
+            # Ensure panel doesn't go off screen
+            new_x = max(10, new_x)
+            
+            # Constrain height if window got smaller
+            max_height = self.height() - 20
+            if panel_height > max_height:
+                panel.resize(panel_width, max_height)
+            
+            panel.move(new_x, new_y)
         
     def _position_widgets(self):
         """Position floating widgets after resize"""

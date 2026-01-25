@@ -644,16 +644,6 @@ class QRSVGLWidget(QtOpenGL.QGLWidget):
         rewards_panel = ui.get_rewards_panel()
         if rewards_panel:
             rewards_panel.update_rewards(state.car_states, self.spectate_idx)
-            # Reposition after update (size may have changed)
-            if rewards_panel.isVisible():
-                panel_width = rewards_panel.sizeHint().width()
-                panel_height = rewards_panel.sizeHint().height()
-                rewards_panel.setGeometry(
-                    width - panel_width - 10,
-                    10,
-                    panel_width,
-                    min(panel_height, height - 20)
-                )
 
         ###########################################
 
