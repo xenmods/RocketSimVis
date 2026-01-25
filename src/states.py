@@ -139,6 +139,43 @@ class ControllerInputs:
         self.jump = j["jump"]
         self.handbrake = j["handbrake"]
 
+class RewardInfo:
+    """Per-reward info for a single player"""
+    def __init__(self, name: str = "", value: float = 0.0):
+        self.name = name
+        self.value = value
+
+class PlayerRewards:
+    """All reward information for a single player"""
+    def __init__(self):
+        self.rewards: list[RewardInfo] = []  # List of individual rewards (instant)
+        self.total_reward: float = 0.0  # Instant total
+        
+        # Cumulative tracking (accumulated over episode)
+        self.cumulative_rewards: dict[str, float] = {}  # name -> cumulative value
+        self.cumulative_total: float = 0.0
+    
+    def read_from_json(self, j):
+        self.rewards = []
+        if "rewards" in j:
+            for reward_entry in j["rewards"]:
+                name = reward_entry.get("name", "Unknown")
+                value = reward_entry.get("value", 0.0)
+                self.rewards.append(RewardInfo(name=name, value=value))
+                
+                # Accumulate rewards
+                if name not in self.cumulative_rewards:
+                    self.cumulative_rewards[name] = 0.0
+                self.cumulative_rewards[name] += value
+                
+        self.total_reward = j.get("total_reward", 0.0)
+        self.cumulative_total += self.total_reward
+    
+    def reset_cumulative(self):
+        """Reset cumulative tracking (call on episode reset)"""
+        self.cumulative_rewards.clear()
+        self.cumulative_total = 0.0
+
 class CarState:
     def __init__(self):
         self.car_id: int = -1
@@ -153,13 +190,23 @@ class CarState:
         self.on_ground: bool = False
         self.has_flipped_or_double_jumped: bool = False
         self.is_demoed: bool = False
+        
+        self.player_rewards: PlayerRewards = PlayerRewards()
 
     def read_from_json(self, j):
         if not (j.get("car_id") is None):
             self.car_id = j["car_id"]
         self.team_num = j["team_num"]
 
+        # Check for teleport/reset before updating physics
+        old_pos = self.phys.next_pos
         self.phys.read_from_json(j["phys"])
+        
+        # Detect episode reset: large position change indicates reset
+        if old_pos is not None:
+            delta = (self.phys.next_pos - old_pos).length
+            if delta > 3000:  # Teleport threshold
+                self.player_rewards.reset_cumulative()
 
         if not (j.get("controls") is None):
             self.controls.read_from_json(j["controls"])
@@ -172,6 +219,9 @@ class CarState:
         if not (j.get("has_flipped_or_double_jumped") is None):
             self.has_flipped_or_double_jumped = j["has_flipped_or_double_jumped"]
         self.is_demoed = j["is_demoed"]
+        
+        # Parse reward info if available
+        self.player_rewards.read_from_json(j)
 
 # From RLGym
 default_boost_pad_locations = (
@@ -222,6 +272,9 @@ class GameState:
 
         self.gamemode = None
         self.render_state = RenderState()
+        
+        # Custom info lines from the sender for UI display
+        self.custom_info: list[tuple[str, str]] = []
 
     def is_boost_big(self, idx):
         z = self.boost_pad_locations[idx].z
@@ -312,3 +365,10 @@ class GameState:
         self.render_state = RenderState()
         if not (j.get("render") is None):
             self.render_state.read_from_json(j["render"])
+        # Parse custom info lines for UI display
+        self.custom_info = []
+        if not (j.get("custom_info") is None):
+            for entry in j["custom_info"]:
+                key = entry.get("key", "")
+                value = entry.get("value", "")
+                self.custom_info.append((key, value))

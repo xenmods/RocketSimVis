@@ -1,4 +1,5 @@
 import string
+from typing import Optional
 
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import moderngl_window.context.pyqt5.window as qtw
 
 from PyQt5 import QtOpenGL, QtWidgets
 from PyQt5.QtCore import QSize, Qt, QTimer, QRect
-from PyQt5.QtGui import QScreen, QColor, QFontMetrics
+from PyQt5.QtGui import QScreen, QColor, QFontMetrics, QPalette, QBrush
 from PyQt5.Qt import QPainter, QWidget, pyqtSlot, QEvent
 
 from config import Config, ConfigVal
@@ -15,6 +16,7 @@ from config import Config, ConfigVal
 from const import WINDOW_SIZE_X, WINDOW_SIZE_Y
 
 _g_ui_widget = None
+_g_rewards_panel = None
 
 _g_scaling_factor = 1
 def update_scaling_factor(app: QtWidgets.QApplication):
@@ -140,7 +142,7 @@ class QEditConfigWidget(QWidget):
         super().update()
 
 class QUIBarWidget(QWidget):
-    SIZE = (200, 150)
+    # No fixed SIZE - will be dynamic based on content
 
     def __init__(self, parent_window):
         QWidget.__init__(self)
@@ -152,7 +154,9 @@ class QUIBarWidget(QWidget):
         self.setAttribute(Qt.WA_StyledBackground)
         self.setAutoFillBackground(True)
 
-        vbox = QtWidgets.QFormLayout()
+        vbox = QtWidgets.QVBoxLayout()
+        vbox.setContentsMargins(8, 8, 8, 8)
+        vbox.setSpacing(4)
 
         self.text_label = QtWidgets.QLabel("...")
         self.text_label.setWordWrap(True)
@@ -165,7 +169,8 @@ class QUIBarWidget(QWidget):
 
         self.setLayout(vbox)
 
-        set_target_size(self)
+        # Set minimum size but allow growing
+        self.setMinimumWidth(round(180 * get_scaling_factor()))
 
         global _g_ui_widget
         _g_ui_widget = self
@@ -179,9 +184,305 @@ class QUIBarWidget(QWidget):
 
     def set_text(self, text: str):
         self.text_label.setText(text)
+        # Adjust size to fit content
+        self.adjustSize()
 
 def get_ui() -> QUIBarWidget:
     return _g_ui_widget
+
+
+class QRewardBarWidget(QWidget):
+    """A single reward bar with name, instant value, cumulative value, and visual bars"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.name = ""
+        self.instant_value = 0.0
+        self.cumulative_value = 0.0
+        self.max_abs_instant = 1.0  # For scaling the instant bar
+        self.max_abs_cumulative = 1.0  # For scaling the cumulative bar
+        
+        self.setMinimumHeight(round(22 * get_scaling_factor()))
+        self.setMinimumWidth(round(500 * get_scaling_factor()))
+        
+    def set_data(self, name: str, instant_value: float, cumulative_value: float,
+                 max_abs_instant: float = 1.0, max_abs_cumulative: float = 1.0):
+        self.name = name
+        self.instant_value = instant_value
+        self.cumulative_value = cumulative_value
+        self.max_abs_instant = max(abs(max_abs_instant), 0.001)
+        self.max_abs_cumulative = max(abs(max_abs_cumulative), 0.001)
+        self.update()
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        rect = self.rect()
+        margin = 2
+        bar_height = rect.height() - margin * 2
+        
+        # Layout: [Name 180px] [Instant bar 100px] [Instant val 70px] [Cumul bar 80px] [Cumul val 70px]
+        name_width = 180
+        instant_bar_width = 100
+        instant_val_width = 70
+        cumul_bar_width = 80
+        cumul_val_width = 70
+        
+        # Draw background
+        painter.fillRect(rect, QColor(25, 25, 25))
+        
+        # Setup font
+        painter.setPen(QColor(220, 220, 220))
+        font = painter.font()
+        font.setPointSize(max(8, round(9 * get_scaling_factor())))
+        painter.setFont(font)
+        
+        x = margin
+        
+        # Draw name
+        name_display = self.name[:22] + "..." if len(self.name) > 25 else self.name
+        painter.drawText(x, margin, name_width - 5, bar_height, 
+                        Qt.AlignLeft | Qt.AlignVCenter, name_display)
+        x += name_width
+        
+        # Draw instant bar (centered at middle of bar area)
+        instant_center = x + instant_bar_width // 2
+        instant_bar_max = (instant_bar_width // 2) - 2
+        clamped_instant = max(-self.max_abs_instant, min(self.max_abs_instant, self.instant_value))
+        instant_ratio = clamped_instant / self.max_abs_instant
+        instant_bar_w = int(abs(instant_ratio) * instant_bar_max)
+        
+        # Draw center line
+        painter.setPen(QColor(60, 60, 60))
+        painter.drawLine(instant_center, margin, instant_center, rect.height() - margin)
+        
+        # Draw instant bar
+        if self.instant_value >= 0:
+            bar_color = QColor(60, 180, 60)
+            bar_rect = QRect(instant_center, margin + 2, instant_bar_w, bar_height - 4)
+        else:
+            bar_color = QColor(180, 60, 60)
+            bar_rect = QRect(instant_center - instant_bar_w, margin + 2, instant_bar_w, bar_height - 4)
+        painter.fillRect(bar_rect, bar_color)
+        x += instant_bar_width
+        
+        # Draw instant value
+        painter.setPen(QColor(200, 200, 200))
+        instant_str = f"{self.instant_value:+.3f}"
+        painter.drawText(x, margin, instant_val_width - 5, bar_height,
+                        Qt.AlignRight | Qt.AlignVCenter, instant_str)
+        x += instant_val_width
+        
+        # Draw cumulative bar (same style, different color tint)
+        cumul_center = x + cumul_bar_width // 2
+        cumul_bar_max = (cumul_bar_width // 2) - 2
+        clamped_cumul = max(-self.max_abs_cumulative, min(self.max_abs_cumulative, self.cumulative_value))
+        cumul_ratio = clamped_cumul / self.max_abs_cumulative
+        cumul_bar_w = int(abs(cumul_ratio) * cumul_bar_max)
+        
+        # Draw center line
+        painter.setPen(QColor(60, 60, 60))
+        painter.drawLine(cumul_center, margin, cumul_center, rect.height() - margin)
+        
+        # Draw cumulative bar (slightly different colors - cyan/magenta)
+        if self.cumulative_value >= 0:
+            bar_color = QColor(60, 160, 180)  # Cyan-ish
+            bar_rect = QRect(cumul_center, margin + 2, cumul_bar_w, bar_height - 4)
+        else:
+            bar_color = QColor(180, 60, 120)  # Magenta-ish
+            bar_rect = QRect(cumul_center - cumul_bar_w, margin + 2, cumul_bar_w, bar_height - 4)
+        painter.fillRect(bar_rect, bar_color)
+        x += cumul_bar_width
+        
+        # Draw cumulative value
+        painter.setPen(QColor(150, 200, 220))  # Cyan tint to differentiate
+        cumul_str = f"{self.cumulative_value:+.2f}"
+        painter.drawText(x, margin, cumul_val_width - 5, bar_height,
+                        Qt.AlignRight | Qt.AlignVCenter, cumul_str)
+
+
+class QPlayerRewardsWidget(QWidget):
+    """Shows all rewards for a single player"""
+    
+    TEAM_COLORS = [QColor(40, 80, 160), QColor(180, 100, 40)]  # Blue, Orange
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setAutoFillBackground(True)
+        
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.setContentsMargins(4, 4, 4, 4)
+        self.layout.setSpacing(2)
+        
+        # Header with player info
+        self.header = QtWidgets.QLabel("Player")
+        self.header.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.header)
+        
+        # Total reward display (instant + cumulative)
+        self.total_label = QtWidgets.QLabel("Instant: 0.000 | Episode: 0.00")
+        self.total_label.setAlignment(Qt.AlignCenter)
+        self.total_label.setStyleSheet("font-weight: bold;")
+        self.layout.addWidget(self.total_label)
+        
+        # Column headers
+        self.column_header = QtWidgets.QLabel("")
+        self.column_header.setAlignment(Qt.AlignLeft)
+        self.column_header.setStyleSheet("color: #888; font-size: 9pt;")
+        self.layout.addWidget(self.column_header)
+        
+        # Container for reward bars
+        self.bars_container = QWidget()
+        self.bars_layout = QtWidgets.QVBoxLayout(self.bars_container)
+        self.bars_layout.setContentsMargins(0, 0, 0, 0)
+        self.bars_layout.setSpacing(1)
+        self.layout.addWidget(self.bars_container)
+        
+        self.reward_bars: list[QRewardBarWidget] = []
+        self.car_id = -1
+        self.team_num = 0
+        
+    def set_player_data(self, car_id: int, team_num: int, rewards: list, 
+                       total_reward: float, cumulative_rewards: dict, cumulative_total: float):
+        self.car_id = car_id
+        self.team_num = team_num
+        
+        # Update header
+        team_name = "Blue" if team_num == 0 else "Orange"
+        self.header.setText(f"Player {car_id} ({team_name})")
+        
+        # Set header background color based on team
+        team_color = self.TEAM_COLORS[team_num] if team_num < 2 else QColor(80, 80, 80)
+        self.header.setStyleSheet(f"background-color: rgb({team_color.red()}, {team_color.green()}, {team_color.blue()}); padding: 2px; border-radius: 2px;")
+        
+        # Update total (instant + cumulative)
+        sign_i = "+" if total_reward >= 0 else ""
+        sign_c = "+" if cumulative_total >= 0 else ""
+        self.total_label.setText(f"Instant: {sign_i}{total_reward:.3f}  |  Episode: {sign_c}{cumulative_total:.2f}")
+        
+        # Column headers
+        self.column_header.setText("                                      Instant                    Episode")
+        
+        # Find max absolute values for scaling bars
+        max_abs_instant = 0.1
+        max_abs_cumulative = 0.1
+        for reward in rewards:
+            max_abs_instant = max(max_abs_instant, abs(reward.value))
+        for val in cumulative_rewards.values():
+            max_abs_cumulative = max(max_abs_cumulative, abs(val))
+        
+        # Ensure we have enough bar widgets
+        while len(self.reward_bars) < len(rewards):
+            bar = QRewardBarWidget(self.bars_container)
+            self.bars_layout.addWidget(bar)
+            self.reward_bars.append(bar)
+        
+        # Hide extra bars
+        for i in range(len(rewards), len(self.reward_bars)):
+            self.reward_bars[i].hide()
+        
+        # Update visible bars
+        for i, reward in enumerate(rewards):
+            cumul_val = cumulative_rewards.get(reward.name, 0.0)
+            self.reward_bars[i].set_data(
+                reward.name, 
+                reward.value, 
+                cumul_val,
+                max_abs_instant,
+                max_abs_cumulative
+            )
+            self.reward_bars[i].show()
+        
+        self.adjustSize()
+
+
+class QRewardsPanelWidget(QWidget):
+    """Panel showing per-player reward information"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setAutoFillBackground(True)
+        
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.setContentsMargins(6, 6, 6, 6)
+        self.layout.setSpacing(4)
+        
+        # Title
+        self.title = QtWidgets.QLabel("Rewards")
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("font-weight: bold; font-size: 11pt;")
+        self.layout.addWidget(self.title)
+        
+        # Container for player reward widgets
+        self.players_container = QWidget()
+        self.players_layout = QtWidgets.QVBoxLayout(self.players_container)
+        self.players_layout.setContentsMargins(0, 0, 0, 0)
+        self.players_layout.setSpacing(6)
+        self.layout.addWidget(self.players_container)
+        
+        self.player_widgets: list[QPlayerRewardsWidget] = []
+        
+        # Set minimum size
+        self.setMinimumWidth(round(520 * get_scaling_factor()))
+        
+        global _g_rewards_panel
+        _g_rewards_panel = self
+    
+    def update_rewards(self, car_states, spectate_idx: int):
+        """
+        Update the rewards panel with current state.
+        
+        Args:
+            car_states: List of CarState objects with reward info
+            spectate_idx: Index of the spectated car, or -1 for arena cam (show all)
+        """
+        # Determine which players to show
+        if spectate_idx >= 0 and spectate_idx < len(car_states):
+            # Following a specific player - show only that player
+            players_to_show = [car_states[spectate_idx]]
+        else:
+            # Arena cam or no valid spectate - show all players
+            players_to_show = car_states
+        
+        # Filter out players with no reward data
+        players_to_show = [p for p in players_to_show if p.player_rewards.rewards]
+        
+        if not players_to_show:
+            self.hide()
+            return
+        
+        self.show()
+        
+        # Ensure we have enough player widgets
+        while len(self.player_widgets) < len(players_to_show):
+            widget = QPlayerRewardsWidget(self.players_container)
+            self.players_layout.addWidget(widget)
+            self.player_widgets.append(widget)
+        
+        # Hide extra widgets
+        for i in range(len(players_to_show), len(self.player_widgets)):
+            self.player_widgets[i].hide()
+        
+        # Update visible widgets
+        for i, car_state in enumerate(players_to_show):
+            self.player_widgets[i].set_player_data(
+                car_id=car_state.car_id,
+                team_num=car_state.team_num,
+                rewards=car_state.player_rewards.rewards,
+                total_reward=car_state.player_rewards.total_reward,
+                cumulative_rewards=car_state.player_rewards.cumulative_rewards,
+                cumulative_total=car_state.player_rewards.cumulative_total
+            )
+            self.player_widgets[i].show()
+        
+        self.adjustSize()
+
+
+def get_rewards_panel() -> Optional[QRewardsPanelWidget]:
+    return _g_rewards_panel
 
 class QRSVWindow(QtWidgets.QMainWindow):
     def __init__(self, gl_widget):
@@ -198,8 +499,14 @@ class QRSVWindow(QtWidgets.QMainWindow):
 
         self.base_layout = QtWidgets.QVBoxLayout(self)
 
+        # Info bar widget (top-left)
         self.bar_widget = QUIBarWidget(self)
         self.layout().addWidget(self.bar_widget)
+
+        # Rewards panel (top-right)
+        self.rewards_panel = QRewardsPanelWidget(self)
+        self.layout().addWidget(self.rewards_panel)
+        self.rewards_panel.hide()  # Hidden until we receive reward data
 
         self.edit_config_widget = QEditConfigWidget(self.gl_widget.config)
         self.layout().addWidget(self.edit_config_widget)
@@ -209,6 +516,23 @@ class QRSVWindow(QtWidgets.QMainWindow):
 
         self.installEventFilter(self)
         self.centralWidget().installEventFilter(self)
+        
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_widgets()
+        
+    def _position_widgets(self):
+        """Position floating widgets after resize"""
+        # Position rewards panel at top-right
+        if self.rewards_panel.isVisible():
+            panel_width = self.rewards_panel.sizeHint().width()
+            panel_height = self.rewards_panel.sizeHint().height()
+            self.rewards_panel.setGeometry(
+                self.width() - panel_width - 10,
+                10,
+                panel_width,
+                min(panel_height, self.height() - 20)
+            )
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.MouseButtonPress:

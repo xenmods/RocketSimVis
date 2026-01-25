@@ -15,7 +15,7 @@ from state_manager import *
 from ribbon import *
 from outline_renderer import OutlineRenderer
 import ui
-from ui import get_ui, QUIBarWidget, QRSVWindow
+from ui import get_ui, get_rewards_panel, QUIBarWidget, QRSVWindow
 from config import Config, ConfigVal
 from collision_mesh_loader import find_collision_mesh_root, load_collision_meshes_for_mode
 
@@ -633,7 +633,27 @@ class QRSVGLWidget(QtOpenGL.QGLWidget):
         if state.recv_interval > 0:
             ui_text += "Network rate: {:.2f}fps".format(1 / state.recv_interval) + "\n"
         ui_text += "Ball speed: {:.2f}kph".format(state.ball_state.prev_vel.length * (9 / 250)) + "\n"
+        
+        # Add any custom info lines from the sender
+        for key, value in state.custom_info:
+            ui_text += "{}: {}\n".format(key, value)
+            
         get_ui().set_text(ui_text)
+        
+        # Update rewards panel
+        rewards_panel = ui.get_rewards_panel()
+        if rewards_panel:
+            rewards_panel.update_rewards(state.car_states, self.spectate_idx)
+            # Reposition after update (size may have changed)
+            if rewards_panel.isVisible():
+                panel_width = rewards_panel.sizeHint().width()
+                panel_height = rewards_panel.sizeHint().height()
+                rewards_panel.setGeometry(
+                    width - panel_width - 10,
+                    10,
+                    panel_width,
+                    min(panel_height, height - 20)
+                )
 
         ###########################################
 

@@ -42,7 +42,14 @@ The format for the gamestate, in pseudo-JSON, is:
 			"boost_amount": <v> (from 0 to 1),
 			"on_ground": <bool>,
 			OPTIONAL "has_flipped_or_double_jumped": <bool>,
-			"is_demoed": <bool>
+			"is_demoed": <bool>,
+			
+			# Per-player reward breakdown for visualization (from GigaLearnCPP)
+			OPTIONAL "rewards": [
+				{ "name": "<reward_name>", "value": <float> },
+				...
+			],
+			OPTIONAL "total_reward": <float>  # Sum of all weighted rewards this step
 		}
 	],
 	
@@ -51,6 +58,13 @@ The format for the gamestate, in pseudo-JSON, is:
 	OPTIONAL "boost_pad_locations": [ [<x>, <y>, <z>], [<x>, <y>, <z>], ... ],
 	
 	# If you don't provide this, no boost pads will be rendered
-	OPTIONAL "boost_pad_states": [ <bool>, <bool>, ... ]
+	OPTIONAL "boost_pad_states": [ <bool>, <bool>, ... ],
+	
+	# Custom info lines to display in the UI info panel
+	# Useful for displaying arbitrary training metrics, episode info, etc.
+	OPTIONAL "custom_info": [
+		{ "key": "<label>", "value": "<display_value>" },
+		...
+	]
 }
 ```
