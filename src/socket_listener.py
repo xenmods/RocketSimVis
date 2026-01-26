@@ -13,7 +13,8 @@ class SocketListener:
         self.should_run = True
 
     def run(self, bind_addr: str, port_num: int):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         sock.bind((bind_addr, port_num))
         sock.settimeout(0.5)
         print("Created socket on {}:{}, listening...".format(bind_addr, port_num))
