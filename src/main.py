@@ -398,7 +398,8 @@ class QRSVGLWidget(QtOpenGL.QGLWidget):
         return pos, pos + cam_dir, (self.config.camera_fov.val if is_spectating_car else self.config.camera_bird_fov.val)
 
     def paintGL(self):
-        width, height = self.width(), self.height()
+        pixel_ratio = self.devicePixelRatioF()
+        width, height = int(self.width() * pixel_ratio), int(self.height() * pixel_ratio)
         self.ctx.viewport = (0, 0, width, height)
 
         cur_time = time.time()
