@@ -1,0 +1,132 @@
+.info-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px);
+  padding: 20px;
+  border-radius: 16px;
+  min-width: 280px;
+  max-width: 400px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.info-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  position: relative;
+}
+
+.status-indicator.connected {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.1);
+}
+
+.status-indicator.disconnected {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.status-indicator .pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-indicator.connected .pulse {
+  background: #2ecc71;
+}
+
+.status-indicator.disconnected .pulse {
+  background: #e74c3c;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.info-item .label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.info-item .value {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+}
+
+.team-blue {
+  color: var(--primary-blue);
+  font-weight: 700;
+}
+
+.team-orange {
+  color: var(--primary-orange);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .info-panel {
+    top: 10px;
+    left: 10px;
+    min-width: 240px;
+    padding: 16px;
+  }
+
+  .info-header h2 {
+    font-size: 16px;
+  }
+
+  .info-item {
+    font-size: 13px;
+  }
+}

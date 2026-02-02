@@ -1,0 +1,217 @@
+.rewards-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px);
+  padding: 20px;
+  border-radius: 16px;
+  min-width: 450px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.rewards-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rewards-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rewards-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rewards-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.player-rewards {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.player-header {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.player-header.team-blue {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.2), rgba(41, 128, 185, 0.3));
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.player-header.team-orange {
+  background: linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.3));
+  color: #e67e22;
+  border: 1px solid rgba(230, 126, 34, 0.3);
+}
+
+.totals-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.total-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.total-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.total-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.total-value.positive {
+  color: #2ecc71;
+}
+
+.total-value.negative {
+  color: #e74c3c;
+}
+
+.rewards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reward-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reward-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.reward-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bar-container {
+  position: relative;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-center-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  z-index: 1;
+}
+
+.bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition: width 0.3s ease;
+  z-index: 0;
+}
+
+.bar-fill.instant.positive {
+  background: linear-gradient(90deg, rgba(46, 204, 113, 0.6), rgba(46, 204, 113, 0.8));
+}
+
+.bar-fill.instant.negative {
+  background: linear-gradient(270deg, rgba(231, 76, 60, 0.6), rgba(231, 76, 60, 0.8));
+}
+
+.bar-fill.cumulative.positive {
+  background: linear-gradient(90deg, rgba(52, 152, 219, 0.6), rgba(52, 152, 219, 0.8));
+}
+
+.bar-fill.cumulative.negative {
+  background: linear-gradient(270deg, rgba(155, 89, 182, 0.6), rgba(155, 89, 182, 0.8));
+}
+
+.bar-value {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  z-index: 2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.bar-value.instant {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.bar-value.cumulative {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 768px) {
+  .rewards-panel {
+    top: 10px;
+    right: 10px;
+    min-width: 300px;
+    max-width: calc(100vw - 20px);
+    padding: 16px;
+  }
+
+  .rewards-header h3 {
+    font-size: 16px;
+  }
+
+  .totals-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bar-value {
+    font-size: 10px;
+  }
+}
