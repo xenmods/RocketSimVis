@@ -54,3 +54,4 @@ __pycache__
 
 # Anything starting with three underscores
 ___*
+.env
